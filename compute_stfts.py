@@ -104,7 +104,7 @@ def threeloop_cqt(signal, sample_freq):
     print("User time: " + str(post.ru_utime - prior.ru_utime))
     return output, frequency_range, time_range
 
-def cqt_two(signal, s_freq):
+def cqt_two_with_kernel(signal, s_freq):
     '''
     Computes the CQT of the signal using two loops without the precomputation of the kernels
     '''
@@ -128,7 +128,7 @@ def cqt_two(signal, s_freq):
     return output, freq, time
 
 
-def stft_twoloops(signal, s_freq):
+def cqt_two_without_kernel(signal, s_freq):
     '''
     Computes the CQT of the signal using two loops with pre-computation of the kernels
     '''
@@ -154,9 +154,10 @@ def stft_twoloops(signal, s_freq):
 
 
 def cqt_single(signal, sample_freq):
-    ''' Compute the CQT of a signal with a single loop
+    ''' 
+    Compute the CQT of a signal with a single loop
     '''
-    max_width = 1/(.03*100)*sample_freq
+    max_width = int(1/(.03*100)*sample_freq)
     frequency_range = 100.*2.**(1./12.*np.array(range(0, 50)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     output = np.zeros((len(time_list), len(frequency_range)))
@@ -164,7 +165,7 @@ def cqt_single(signal, sample_freq):
     prior = resource.getrusage(resource.RUSAGE_SELF)
     n_sig = np.ones((len(time_list) , max_width))
     for l_1, t in enumerate(time_list):
-        output[l_1] = np.sum(signal[l_1:l_1 + max_width] * kernel, axis=1)
+        output[l_1] = np.sum(signal[t:t + max_width] * kernel, axis=1)
     # output = n_sig.dot(np.asarray(kernel).transpose())
     post = resource.getrusage(resource.RUSAGE_SELF)
     print("System time: " + str(post.ru_stime - prior.ru_stime))
@@ -172,8 +173,31 @@ def cqt_single(signal, sample_freq):
 
     return output, frequency_range, time_list
 
+def matrix_cqt(signal, sample_freq):
+    max_width = int(1/(.03*100)*sample_freq)
+    frequency_range = 100.*2.**(1./12.*np.array(range(0, 50)))
+    time_list = range(0, int(len(signal) - max_width), int(max_width/2))
+    output = np.zeros((len(time_list), len(frequency_range)))
+    kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
+    h = int(max_width/2)
+    n = time_list[-1] + h
+    col_index = np.arange(0, n, h)
+    row_index = np.arange(max_width)
+    index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
+    prior = resource.getrusage(resource.RUSAGE_SELF)
+    sliced_signal = signal[index]
+    output = sliced_signal.dot(np.asarray(kernel).transpose())
+    post = resource.getrusage(resource.RUSAGE_SELF)
+    print("System time: " + str(post.ru_stime - prior.ru_stime))
+    print("User time: " + str(post.ru_utime - prior.ru_utime))
+    return output, frequency_range, time_list
+
 
 def theano_stft(signal, width, s_freq):
+    '''
+    Slow and not of any use. Kept for record purpose
+    '''
+
     max_width = 1/(.03*100)*s_freq
     freq = 100.*2.**(1./12.*np.array(range(0, 50)))
     time = range(0, int(len(signal) - max_width), int(max_width/2))
@@ -197,7 +221,6 @@ def theano_stft(signal, width, s_freq):
  
 
 def vectorized_theano(signal, width, s_freq):
-
     '''
     The Code is currently being tested. It's not fully implemented.
     It's being tested with memory and speed.
@@ -228,11 +251,16 @@ def vectorized_theano(signal, width, s_freq):
     print(time1 - time0)
     return output, freq, time_list
 
-noise = np.random.randn(132300)
-pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(132300))
-final_signal = pure_signal + noise
-# out = threeloop_cqt(signal, 44100)
-ground_out = cqt_single(final_signal, 44100)
-pylab.imshow(np.log(np.abs(ground_out[0])), origin='lower', aspect='auto')
-pylab.show()
+if __name__ == '__main__':
+    noise = np.random.randn(132300)
+    pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(132300))
+    final_signal = pure_signal + noise
+    # out = threeloop_cqt(signal, 44100)
+    three_loop = threeloop_cqt(final_signal, 44100)
+    two_kernel = cqt_two_with_kernel(final_signal, 44100)
+    two_wkernel = cqt_two_without_kernel(final_signal, 44100)
+    single_cqt = cqt_single(final_signal, 44100)
+    ground_out = matrix_cqt(final_signal, 44100)
+    pylab.imshow(np.log(np.abs(ground_out[0])), origin='lower', aspect='auto')
+    pylab.show()
 
