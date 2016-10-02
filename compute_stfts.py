@@ -100,8 +100,8 @@ def threeloop_cqt(signal, sample_freq):
             for i in range(t, t+int(current_width)):
                 output[m, n] += np.exp(i * 1j * (-2 * math.pi) * f / sample_freq) * (signal[i] * window[i-t])
     post = resource.getrusage(resource.RUSAGE_SELF)
-    print("System time: " + str(post.ru_stime - prior.ru_stime))
-    print("User time: " + str(post.ru_utime - prior.ru_utime))
+    print("System time for three loop computation : " + str(post.ru_stime - prior.ru_stime))
+    print("User time for three loop computation : " + str(post.ru_utime - prior.ru_utime))
     return output, frequency_range, time_range
 
 def cqt_two_with_kernel(signal, s_freq):
@@ -122,8 +122,8 @@ def cqt_two_with_kernel(signal, s_freq):
             output[l_1, l_2] = np.sum((np.exp(w_i * 1j * (-2 * math.pi) * f / s_freq) * windows) * n_signal)
     
     post = resource.getrusage(resource.RUSAGE_SELF)
-    print("System time: " + str(post.ru_stime - prior.ru_stime))
-    print("User time: " + str(post.ru_utime - prior.ru_utime))
+    print("System time for two loop computation : " + str(post.ru_stime - prior.ru_stime))
+    print("User time for two loop computation : " + str(post.ru_utime - prior.ru_utime))
  
     return output, freq, time
 
@@ -146,8 +146,8 @@ def cqt_two_without_kernel(signal, s_freq):
             output[l_1, l_2] = np.sum(np.exp(i_exp * 2j * math.pi * f / s_freq) * windows[l_2] * n_signal)
     
     post = resource.getrusage(resource.RUSAGE_SELF)
-    print("System time: " + str(post.ru_stime - prior.ru_stime))
-    print("User time: " + str(post.ru_utime - prior.ru_utime))
+    print("System time for two loop with pre computed kernel: " + str(post.ru_stime - prior.ru_stime))
+    print("User time for two loop with pre computed kernel: " + str(post.ru_utime - prior.ru_utime))
     return output, freq, time_list
         
 # windows[l_2].extend([0] * (len() - (len(my_list))))
@@ -168,8 +168,8 @@ def cqt_single(signal, sample_freq):
         output[l_1] = np.sum(signal[t:t + max_width] * kernel, axis=1)
     # output = n_sig.dot(np.asarray(kernel).transpose())
     post = resource.getrusage(resource.RUSAGE_SELF)
-    print("System time: " + str(post.ru_stime - prior.ru_stime))
-    print("User time: " + str(post.ru_utime - prior.ru_utime))
+    print("System time for single loop computation: " + str(post.ru_stime - prior.ru_stime))
+    print("User time for single loop computation: " + str(post.ru_utime - prior.ru_utime))
 
     return output, frequency_range, time_list
 
@@ -188,8 +188,8 @@ def matrix_cqt(signal, sample_freq):
     sliced_signal = signal[index]
     output = sliced_signal.dot(np.asarray(kernel).transpose())
     post = resource.getrusage(resource.RUSAGE_SELF)
-    print("System time: " + str(post.ru_stime - prior.ru_stime))
-    print("User time: " + str(post.ru_utime - prior.ru_utime))
+    print("System time for direct computation : " + str(post.ru_stime - prior.ru_stime))
+    print("User time for direct computation : " + str(post.ru_utime - prior.ru_utime))
     return output, frequency_range, time_list
 
 
@@ -220,47 +220,63 @@ def theano_stft(signal, width, s_freq):
     return output, freq, time
  
 
-def vectorized_theano(signal, width, s_freq):
+def vectorized_theano(signal, sample_freq):
     '''
     The Code is currently being tested. It's not fully implemented.
     It's being tested with memory and speed.
     '''
-
-    max_width = 1/(.03*100)*s_freq
-    freq = 100.*2.**(1./12.*np.array(range(0, 50)))
+    max_width = int(1/(.03*100)*sample_freq)
+    frequency_range = 100.*2.**(1./12.*np.array(range(0, 50)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
-
     signal_matrix = T.fvector("signal_matrix")
-    kernel_matrix = T.fmatrix()
+    kernel_matrix = T.fmatrix("kernel matrix")
+    kernel, k_size = pre_compute_kernels(sample_freq, frequency_range, max_width)
+    output = np.zeros((len(time_list), len(frequency_range)))
+    prior = resource.getrusage(resource.RUSAGE_SELF)
     cqt_compute = kernel_matrix * signal_matrix
-    kernel, k_size = pre_compute_kernels(s_freq, freq, width)
     func = theano.function([kernel_matrix, signal_matrix], cqt_compute, allow_input_downcast=True)
-    print("Computing theano time")
-    time0 = time.time()
-    n_signal = np.zeros((len(time_list), k_size))
     for l_1, t in enumerate(time_list):
-        n_signal[l_1] = signal[l_1:l_1 + k_size]
-    result, updates = theano.scan(fn=lambda n_signal, kernel: np.sum(n_signal * kernel),
-                                  non_sequences=kernel, n_steps=len(n_signal))
-    n_s = T.fmatrix()
-    n_k = T.fmatrix()
-    
-    compute_cqt = theano.function([n_s, n_k], result, updates=updates)
-    compute_cqt(n_signal, kernel)
-    time1 = time.time()
-    print(time1 - time0)
-    return output, freq, time_list
+        n_signal = signal[l_1:l_1 + k_size]
+        output[l_1] = np.sum(func(kernel, n_signal), axis=1)
+    post = resource.getrusage(resource.RUSAGE_SELF)
+    print("System time for vectorized theano : " + str(post.ru_stime - prior.ru_stime))
+    print("User time for vectorized theano: " + str(post.ru_utime - prior.ru_utime))
+    return output, frequency_range, time_list
+
+def matrix_theano(signal, sample_freq):
+    max_width = int(1/(.03*100)*sample_freq)
+    frequency_range = 100.*2.**(1./12.*np.array(range(0, 50)))
+    time_list = range(0, int(len(signal) - max_width), int(max_width/2))
+    signal_matrix = T.fmatrix("Signal Matrix")
+    kernel_matrix = T.fmatrix("Kernel Matrix")
+    kernel, k_size = pre_compute_kernels(sample_freq, frequency_range, max_width)
+    h = int(max_width/2)
+    n = time_list[-1] + h
+    col_index = np.arange(0, n, h)
+    row_index = np.arange(max_width)
+    index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
+    sliced_signal = signal[index]
+    prior = resource.getrusage(resource.RUSAGE_SELF)
+    cqt_compute = T.dot(signal_matrix, kernel_matrix.T)
+    func = theano.function([signal_matrix, kernel_matrix], cqt_compute, allow_input_downcast=True)
+    output = func(sliced_signal, kernel)
+    post = resource.getrusage(resource.RUSAGE_SELF)
+    print("System time for matrix theano: " + str(post.ru_stime - prior.ru_stime))
+    print("User time for matrix theano: " + str(post.ru_utime - prior.ru_utime))
+    return output, frequency_range, time_list
 
 if __name__ == '__main__':
-    noise = np.random.randn(132300)
-    pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(132300))
+    noise = np.random.randn(13230000)
+    pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(13230000))
     final_signal = pure_signal + noise
     # out = threeloop_cqt(signal, 44100)
-    three_loop = threeloop_cqt(final_signal, 44100)
+    # three_loop = threeloop_cqt(final_signal, 44100)
     two_kernel = cqt_two_with_kernel(final_signal, 44100)
     two_wkernel = cqt_two_without_kernel(final_signal, 44100)
     single_cqt = cqt_single(final_signal, 44100)
+    theano_vectorized = vectorized_theano(final_signal, 44100)
+    theano_matrix = matrix_theano(final_signal, 44100)
     ground_out = matrix_cqt(final_signal, 44100)
-    pylab.imshow(np.log(np.abs(ground_out[0])), origin='lower', aspect='auto')
+    pylab.imshow(np.log(np.abs(theano_matrix[0])), origin='lower', aspect='auto')
     pylab.show()
 
