@@ -11,6 +11,7 @@ import itertools
 import theano
 import theano.tensor as T
 import resource
+import matplotlib.pyplot as plt
 
 
 def pre_compute_kernels(sample_freq, frequency_range, default_width, output="kernel"):
@@ -100,9 +101,10 @@ def threeloop_cqt(signal, sample_freq):
             for i in range(t, t+int(current_width)):
                 output[m, n] += np.exp(i * 1j * (-2 * math.pi) * f / sample_freq) * (signal[i] * window[i-t])
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for three loop computation : " + str(post.ru_stime - prior.ru_stime))
     print("User time for three loop computation : " + str(post.ru_utime - prior.ru_utime))
-    return output, frequency_range, time_range
+    return output, user_time
 
 def cqt_two_with_kernel(signal, s_freq):
     '''
@@ -122,10 +124,11 @@ def cqt_two_with_kernel(signal, s_freq):
             output[l_1, l_2] = np.sum((np.exp(w_i * 1j * (-2 * math.pi) * f / s_freq) * windows) * n_signal)
     
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for two loop computation : " + str(post.ru_stime - prior.ru_stime))
     print("User time for two loop computation : " + str(post.ru_utime - prior.ru_utime))
  
-    return output, freq, time
+    return output, user_time
 
 
 def cqt_two_without_kernel(signal, s_freq):
@@ -146,9 +149,10 @@ def cqt_two_without_kernel(signal, s_freq):
             output[l_1, l_2] = np.sum(np.exp(i_exp * 2j * math.pi * f / s_freq) * windows[l_2] * n_signal)
     
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for two loop with pre computed kernel: " + str(post.ru_stime - prior.ru_stime))
     print("User time for two loop with pre computed kernel: " + str(post.ru_utime - prior.ru_utime))
-    return output, freq, time_list
+    return output, user_time
         
 # windows[l_2].extend([0] * (len() - (len(my_list))))
 
@@ -168,12 +172,20 @@ def cqt_single(signal, sample_freq):
         output[l_1] = np.sum(signal[t:t + max_width] * kernel, axis=1)
     # output = n_sig.dot(np.asarray(kernel).transpose())
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for single loop computation: " + str(post.ru_stime - prior.ru_stime))
     print("User time for single loop computation: " + str(post.ru_utime - prior.ru_utime))
 
-    return output, frequency_range, time_list
+    return output, user_time
 
 def matrix_cqt(signal, sample_freq):
+    '''
+    Direct computation of CQT using numpy.
+    The signal matrix is constructed by advanced indexing of the
+    signal vector. The CQT is the dot product of signal with the transpose of the kernel
+    matrix.
+    '''
+
     max_width = int(1/(.03*100)*sample_freq)
     frequency_range = 100.*2.**(1./12.*np.array(range(0, 50)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
@@ -188,10 +200,11 @@ def matrix_cqt(signal, sample_freq):
     sliced_signal = signal[index]
     output = sliced_signal.dot(np.asarray(kernel).transpose())
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for direct computation : " + str(post.ru_stime - prior.ru_stime))
     print("User time for direct computation : " + str(post.ru_utime - prior.ru_utime))
-    return output, frequency_range, time_list
-
+    return output, user_time
+# Computation of CQT using theano.
 
 def theano_stft(signal, width, s_freq):
     '''
@@ -239,11 +252,16 @@ def vectorized_theano(signal, sample_freq):
         n_signal = signal[l_1:l_1 + k_size]
         output[l_1] = np.sum(func(kernel, n_signal), axis=1)
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for vectorized theano : " + str(post.ru_stime - prior.ru_stime))
     print("User time for vectorized theano: " + str(post.ru_utime - prior.ru_utime))
-    return output, frequency_range, time_list
+    return output, user_time
 
 def matrix_theano(signal, sample_freq):
+    '''
+    Direct computation of CQT without any loop using theano
+    '''
+
     max_width = int(1/(.03*100)*sample_freq)
     frequency_range = 100.*2.**(1./12.*np.array(range(0, 50)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
@@ -261,22 +279,35 @@ def matrix_theano(signal, sample_freq):
     func = theano.function([signal_matrix, kernel_matrix], cqt_compute, allow_input_downcast=True)
     output = func(sliced_signal, kernel)
     post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
     print("System time for matrix theano: " + str(post.ru_stime - prior.ru_stime))
     print("User time for matrix theano: " + str(post.ru_utime - prior.ru_utime))
-    return output, frequency_range, time_list
+    return output, user_time
 
 if __name__ == '__main__':
-    noise = np.random.randn(13230000)
-    pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(13230000))
-    final_signal = pure_signal + noise
-    # out = threeloop_cqt(signal, 44100)
-    # three_loop = threeloop_cqt(final_signal, 44100)
-    two_kernel = cqt_two_with_kernel(final_signal, 44100)
-    two_wkernel = cqt_two_without_kernel(final_signal, 44100)
-    single_cqt = cqt_single(final_signal, 44100)
-    theano_vectorized = vectorized_theano(final_signal, 44100)
-    theano_matrix = matrix_theano(final_signal, 44100)
-    ground_out = matrix_cqt(final_signal, 44100)
-    pylab.imshow(np.log(np.abs(theano_matrix[0])), origin='lower', aspect='auto')
-    pylab.show()
+    mul_factor = 10
+    mul_count = 0
+    signal_base = 132300
+    three_loop, two_kernel, two_w_kernel = [], [], []
+    single_cqt, theano_vectorized, theano_matrix = [], [], []
+    direct_cqt = []
+    while  True:
+        if mul_count >= 3:
+            break
+        signal_base = signal_base * mul_factor
+        noise = np.random.randn(signal_base)
+        pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(signal_base))
+        final_signal = pure_signal + noise
+        # three_loop.append(threeloop_cqt(final_signal, 44100)[1])
+        two_kernel.append(cqt_two_with_kernel(final_signal, 44100)[1])
+        two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100)[1])
+        single_cqt.append(cqt_single(final_signal, 44100)[1])
+        theano_vectorized.append(vectorized_theano(final_signal, 44100)[1])
+        theano_matrix.append(matrix_theano(final_signal, 44100)[1])
+        direct_cqt.append(matrix_cqt(final_signal, 44100)[1])
+        mul_count += 1
+    plt.plot(three_loop, 'blue', two_w_kernel, 'green', single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
+    plt.show()
+    # pylab.imshow(np.log(np.abs(theano_matrix[0])), origin='lower', aspect='auto')
+    # pylab.show()
 
