@@ -285,7 +285,7 @@ def matrix_theano(signal, sample_freq):
     return output, user_time
 
 if __name__ == '__main__':
-    mul_factor = 10
+    mul_factor = 5
     mul_count = 0
     signal_base = 132300
     three_loop, two_kernel, two_w_kernel = [], [], []
@@ -294,17 +294,17 @@ if __name__ == '__main__':
     while  True:
         if mul_count >= 3:
             break
-        signal_base = signal_base * mul_factor
         noise = np.random.randn(signal_base)
         pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(signal_base))
         final_signal = pure_signal + noise
-        # three_loop.append(threeloop_cqt(final_signal, 44100)[1])
+        three_loop.append(threeloop_cqt(final_signal, 44100)[1])
         two_kernel.append(cqt_two_with_kernel(final_signal, 44100)[1])
         two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100)[1])
         single_cqt.append(cqt_single(final_signal, 44100)[1])
         theano_vectorized.append(vectorized_theano(final_signal, 44100)[1])
         theano_matrix.append(matrix_theano(final_signal, 44100)[1])
         direct_cqt.append(matrix_cqt(final_signal, 44100)[1])
+        signal_base = signal_base * mul_factor
         mul_count += 1
     plt.plot(three_loop, 'blue', two_w_kernel, 'green', single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
     plt.show()
