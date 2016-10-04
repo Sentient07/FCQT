@@ -76,7 +76,7 @@ def pre_compute_kernels(sample_freq, frequency_range, default_width, output="ker
         return window_list, max(comp_width)
     return kernel, max(comp_width)
 
-    
+
 def threeloop_cqt(signal, sample_freq, channels=1):
     '''
     Computes the CQT of a signal using three loops.
@@ -130,7 +130,6 @@ def cqt_two_with_kernel(signal, s_freq, channels=1):
  
     return output, user_time
 
-
 def cqt_two_without_kernel(signal, s_freq, channels=1):
     '''
     Computes the CQT of the signal using two loops with pre-computation of the kernels
@@ -155,7 +154,6 @@ def cqt_two_without_kernel(signal, s_freq, channels=1):
     return output, user_time
         
 # windows[l_2].extend([0] * (len() - (len(my_list))))
-
 
 def cqt_single(signal, sample_freq, channels=1):
     ''' 
@@ -232,7 +230,6 @@ def theano_stft(signal, width, s_freq, channels=1):
 
     return output, freq, time
  
-
 def vectorized_theano(signal, sample_freq, channels=1):
     '''
     The Code is currently being tested. It's not fully implemented.
@@ -301,7 +298,7 @@ def plot_usertime_graph(signal_base, mul_factor):
         final_signal = generate_signal(signal_base, mul_factor)
         # three_loop.append(threeloop_cqt(final_signal, 44100)[1])
         # two_kernel.append(cqt_two_with_kernel(final_signal, 44100)[1])
-        two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100)[1])
+        # two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100)[1])
         single_cqt.append(cqt_single(final_signal, 44100)[1])
         theano_vectorized.append(vectorized_theano(final_signal, 44100)[1])
         theano_matrix.append(matrix_theano(final_signal, 44100)[1])
@@ -309,6 +306,8 @@ def plot_usertime_graph(signal_base, mul_factor):
         signal_base = signal_base * mul_factor
         mul_count += 1
     plt.plot(single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
+    ax = plt.gca()
+    ax.set_yticklabels(ax.get_yticks())
     plt.show()
 
 def plot_channel_graph(final_signal, channels):
@@ -316,20 +315,23 @@ def plot_channel_graph(final_signal, channels):
     single_cqt, theano_vectorized, theano_matrix = [], [], []
     direct_cqt = []
     for i in channels:
-        three_loop.append(threeloop_cqt(final_signal, 44100, i)[1])
-        two_kernel.append(cqt_two_with_kernel(final_signal, 44100, i)[1])
-        two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100, i)[1])
+        # three_loop.append(threeloop_cqt(final_signal, 44100, i)[1])
+        # two_kernel.append(cqt_two_with_kernel(final_signal, 44100, i)[1])
+        # two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100, i)[1])
         single_cqt.append(cqt_single(final_signal, 44100, i)[1])
         theano_vectorized.append(vectorized_theano(final_signal, 44100, i)[1])
         theano_matrix.append(matrix_theano(final_signal, 44100, i)[1])
         direct_cqt.append(matrix_cqt(final_signal, 44100, i)[1])
-    plt.plot(three_loop, 'blue', two_w_kernel, 'green', single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
+    print(theano_vectorized)
+    plt.plot(single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
+    ax = plt.gca()
+    ax.set_yticklabels(ax.get_yticks())
     plt.show()
 
 if __name__ == '__main__':
     signal_base = 132300
     mul_factor = 5
-    # plot_usertime_graph(signal_base, mul_factor)
+    plot_usertime_graph(signal_base, mul_factor)
     channels = np.arange(1, 5)
     plot_channel_graph(generate_signal(signal_base), channels)
     plot_usertime_graph(signal_base, mul_factor)
