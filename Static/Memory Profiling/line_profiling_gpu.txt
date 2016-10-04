@@ -1,0 +1,126 @@
+Total time: 19.6192 s
+File: compute_stfts.py
+Function: cqt_single at line 158
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   158                                           @profile
+   159                                           def cqt_single(signal, sample_freq, channels=1):
+   160                                               ''' 
+   161                                               Compute the CQT of a signal with a single loop
+   162                                               '''
+   163         3           26      8.7      0.0      max_width = int(1/(.03*100)*sample_freq)
+   164         3          134     44.7      0.0      frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+   165         3           53     17.7      0.0      time_list = range(0, int(len(signal) - max_width), int(max_width/2))
+   166         3           44     14.7      0.0      output = np.zeros((len(time_list), len(frequency_range)))
+   167         3       161944  53981.3      0.8      kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
+   168         3           31     10.3      0.0      prior = resource.getrusage(resource.RUSAGE_SELF)
+   169         3       245920  81973.3      1.3      n_sig = np.ones((len(time_list) , max_width))
+   170      2787         7247      2.6      0.0      for l_1, t in enumerate(time_list):
+   171      2784     19203723   6897.9     97.9          output[l_1] = np.sum(signal[t:t + max_width] * kernel, axis=1)
+   172                                               # output = n_sig.dot(np.asarray(kernel).transpose())
+   173         3           20      6.7      0.0      post = resource.getrusage(resource.RUSAGE_SELF)
+   174         3           13      4.3      0.0      user_time = post.ru_utime - prior.ru_utime
+   175         3           77     25.7      0.0      print("System time for single loop computation: " + str(post.ru_stime - prior.ru_stime))
+   176         3           15      5.0      0.0      print("User time for single loop computation: " + str(post.ru_utime - prior.ru_utime))
+   177                                           
+   178         3            3      1.0      0.0      return output, user_time
+
+Total time: 1.57347 s
+File: compute_stfts.py
+Function: matrix_cqt at line 179
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   179                                           @profile
+   180                                           def matrix_cqt(signal, sample_freq, channels=1):
+   181                                               '''
+   182                                               Direct computation of CQT using numpy.
+   183                                               The signal matrix is constructed by advanced indexing of the
+   184                                               signal vector. The CQT is the dot product of signal with the transpose of the kernel
+   185                                               matrix.
+   186                                               '''
+   187                                           
+   188         3           15      5.0      0.0      max_width = int(1/(.03*100)*sample_freq)
+   189         3          127     42.3      0.0      frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+   190         3           66     22.0      0.0      time_list = range(0, int(len(signal) - max_width), int(max_width/2))
+   191         3           78     26.0      0.0      output = np.zeros((len(time_list), len(frequency_range)))
+   192         3       206690  68896.7     13.1      kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
+   193         3            6      2.0      0.0      h = int(max_width/2)
+   194         3            4      1.3      0.0      n = time_list[-1] + h
+   195         3           11      3.7      0.0      col_index = np.arange(0, n, h)
+   196         3           21      7.0      0.0      row_index = np.arange(max_width)
+   197         3       143113  47704.3      9.1      index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
+   198         3           37     12.3      0.0      prior = resource.getrusage(resource.RUSAGE_SELF)
+   199         3       215253  71751.0     13.7      sliced_signal = signal[index]
+   200         3      1007924 335974.7     64.1      output = sliced_signal.dot(np.asarray(kernel).transpose())
+   201         3           33     11.0      0.0      post = resource.getrusage(resource.RUSAGE_SELF)
+   202         3            9      3.0      0.0      user_time = post.ru_utime - prior.ru_utime
+   203         3           61     20.3      0.0      print("System time for direct computation : " + str(post.ru_stime - prior.ru_stime))
+   204         3           22      7.3      0.0      print("User time for direct computation : " + str(post.ru_utime - prior.ru_utime))
+   205         3            3      1.0      0.0      return output, user_time
+
+Total time: 16.3114 s
+File: compute_stfts.py
+Function: vectorized_theano at line 234
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   234                                           @profile
+   235                                           def vectorized_theano(signal, sample_freq, channels=1):
+   236                                               '''
+   237                                               The Code is currently being tested. It's not fully implemented.
+   238                                               It's being tested with memory and speed.
+   239                                               '''
+   240         3           15      5.0      0.0      max_width = int(1/(.03*100)*sample_freq)
+   241         3          103     34.3      0.0      frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+   242         3           52     17.3      0.0      time_list = range(0, int(len(signal) - max_width), int(max_width/2))
+   243         3         1701    567.0      0.0      signal_matrix = T.fvector("signal_matrix")
+   244         3          311    103.7      0.0      kernel_matrix = T.fmatrix("kernel matrix")
+   245         3       154520  51506.7      0.9      kernel, k_size = pre_compute_kernels(sample_freq, frequency_range, max_width)
+   246         3          111     37.0      0.0      output = np.zeros((len(time_list), len(frequency_range)))
+   247         3           25      8.3      0.0      prior = resource.getrusage(resource.RUSAGE_SELF)
+   248         3        10402   3467.3      0.1      cqt_compute = kernel_matrix * signal_matrix
+   249         3      1630450 543483.3     10.0      func = theano.function([kernel_matrix, signal_matrix], cqt_compute, allow_input_downcast=True)
+   250      2787         6418      2.3      0.0      for l_1, t in enumerate(time_list):
+   251      2784         5294      1.9      0.0          n_signal = signal[l_1:l_1 + k_size]
+   252      2784     14501902   5209.0     88.9          output[l_1] = np.sum(func(kernel, n_signal), axis=1)
+   253         3           22      7.3      0.0      post = resource.getrusage(resource.RUSAGE_SELF)
+   254         3            6      2.0      0.0      user_time = post.ru_utime - prior.ru_utime
+   255         3           50     16.7      0.0      print("System time for vectorized theano : " + str(post.ru_stime - prior.ru_stime))
+   256         3           14      4.7      0.0      print("User time for vectorized theano: " + str(post.ru_utime - prior.ru_utime))
+   257         3            4      1.3      0.0      return output, user_time
+
+Total time: 3.15742 s
+File: compute_stfts.py
+Function: matrix_theano at line 259
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   259                                           @profile
+   260                                           def matrix_theano(signal, sample_freq, channels=1):
+   261                                               '''
+   262                                               Direct computation of CQT without any loop using theano
+   263                                               '''
+   264                                           
+   265         3           11      3.7      0.0      max_width = int(1/(.03*100)*sample_freq)
+   266         3           92     30.7      0.0      frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+   267         3           35     11.7      0.0      time_list = range(0, int(len(signal) - max_width), int(max_width/2))
+   268         3          489    163.0      0.0      signal_matrix = T.fmatrix("Signal Matrix")
+   269         3         2168    722.7      0.1      kernel_matrix = T.fmatrix("Kernel Matrix")
+   270         3       163660  54553.3      5.2      kernel, k_size = pre_compute_kernels(sample_freq, frequency_range, max_width)
+   271         3           13      4.3      0.0      h = int(max_width/2)
+   272         3            6      2.0      0.0      n = time_list[-1] + h
+   273         3           20      6.7      0.0      col_index = np.arange(0, n, h)
+   274         3           33     11.0      0.0      row_index = np.arange(max_width)
+   275         3       155338  51779.3      4.9      index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
+   276         3           39     13.0      0.0      prior = resource.getrusage(resource.RUSAGE_SELF)
+   277         3       249788  83262.7      7.9      sliced_signal = signal[index]
+   278         3         5879   1959.7      0.2      cqt_compute = T.dot(signal_matrix, kernel_matrix.T)
+   279         3       152992  50997.3      4.8      func = theano.function([signal_matrix, kernel_matrix], cqt_compute, allow_input_downcast=True)
+   280         3      2426749 808916.3     76.9      output = func(sliced_signal, kernel)
+   281         3           28      9.3      0.0      post = resource.getrusage(resource.RUSAGE_SELF)
+   282         3            8      2.7      0.0      user_time = post.ru_utime - prior.ru_utime
+   283         3           60     20.0      0.0      print("System time for matrix theano: " + str(post.ru_stime - prior.ru_stime))
+   284         3           13      4.3      0.0      print("User time for matrix theano: " + str(post.ru_utime - prior.ru_utime))
+   285         3            3      1.0      0.0      return output, user_time

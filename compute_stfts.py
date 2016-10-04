@@ -155,6 +155,7 @@ def cqt_two_without_kernel(signal, s_freq, channels=1):
         
 # windows[l_2].extend([0] * (len() - (len(my_list))))
 
+@profile
 def cqt_single(signal, sample_freq, channels=1):
     ''' 
     Compute the CQT of a signal with a single loop
@@ -175,7 +176,7 @@ def cqt_single(signal, sample_freq, channels=1):
     print("User time for single loop computation: " + str(post.ru_utime - prior.ru_utime))
 
     return output, user_time
-
+@profile
 def matrix_cqt(signal, sample_freq, channels=1):
     '''
     Direct computation of CQT using numpy.
@@ -230,6 +231,7 @@ def theano_stft(signal, width, s_freq, channels=1):
 
     return output, freq, time
  
+@profile
 def vectorized_theano(signal, sample_freq, channels=1):
     '''
     The Code is currently being tested. It's not fully implemented.
@@ -254,6 +256,7 @@ def vectorized_theano(signal, sample_freq, channels=1):
     print("User time for vectorized theano: " + str(post.ru_utime - prior.ru_utime))
     return output, user_time
 
+@profile
 def matrix_theano(signal, sample_freq, channels=1):
     '''
     Direct computation of CQT without any loop using theano
