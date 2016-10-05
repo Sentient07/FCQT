@@ -155,7 +155,6 @@ def cqt_two_without_kernel(signal, s_freq, channels=1):
         
 # windows[l_2].extend([0] * (len() - (len(my_list))))
 
-@profile
 def cqt_single(signal, sample_freq, channels=1):
     ''' 
     Compute the CQT of a signal with a single loop
@@ -176,7 +175,7 @@ def cqt_single(signal, sample_freq, channels=1):
     print("User time for single loop computation: " + str(post.ru_utime - prior.ru_utime))
 
     return output, user_time
-@profile
+
 def matrix_cqt(signal, sample_freq, channels=1):
     '''
     Direct computation of CQT using numpy.
@@ -231,7 +230,7 @@ def theano_stft(signal, width, s_freq, channels=1):
 
     return output, freq, time
  
-@profile
+
 def vectorized_theano(signal, sample_freq, channels=1):
     '''
     The Code is currently being tested. It's not fully implemented.
@@ -256,7 +255,6 @@ def vectorized_theano(signal, sample_freq, channels=1):
     print("User time for vectorized theano: " + str(post.ru_utime - prior.ru_utime))
     return output, user_time
 
-@profile
 def matrix_theano(signal, sample_freq, channels=1):
     '''
     Direct computation of CQT without any loop using theano
@@ -290,11 +288,31 @@ def generate_signal(signal_base, mul_factor=1):
     final_signal = pure_signal + noise
     return final_signal
 
-def plot_usertime_graph(signal_base, mul_factor):
+def plot_graph():
+    fig, ax = plt.subplots()
+    plt.title("Variable channel vs Time Graph")
+    ax.plot(channels, single_cqt, 'black', label="black")
+    ax.plot(channels, theano_vectorized, 'green', label="green")
+    ax.plot(channels, theano_matrix, 'red', label="red")
+    ax.plot(channels, direct_cqt, 'blue', label="blue")
+    ax.ticklabel_format(useOffset=False)
+    ax.axis([1, 4, 0, 0.5])
+    ax.set_xlabel('Number of Channels')
+    ax.set_ylabel('Time taken for execution (in sec)')
+    plt.xticks(np.arange(1, 5, 1))
+    plt.annotate("Black - Single Looped Numpy", xy=(2.3, 0.4))
+    plt.annotate("Green - Single Loop Theano", xy=(2.3, 0.42))
+    plt.annotate("Blue - Matrix Multiplication, Numpy", xy=(2.3, 0.44))
+    plt.annotate("Red - Matrix Multiplication Theano", xy=(2.3, 0.46))
+    plt.ylim()
+    plt.show()
+
+def usertime_graph(signal_base, mul_factor):
     mul_count = 0
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
     direct_cqt = []
+    signal_length = []
     while  True:
         if mul_count >= 3:
             break
@@ -307,13 +325,26 @@ def plot_usertime_graph(signal_base, mul_factor):
         theano_matrix.append(matrix_theano(final_signal, 44100)[1])
         direct_cqt.append(matrix_cqt(final_signal, 44100)[1])
         signal_base = signal_base * mul_factor
+        signal_length.append(signal_base)
         mul_count += 1
-    plt.plot(single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
-    ax = plt.gca()
-    ax.set_yticklabels(ax.get_yticks())
+    fig, ax = plt.subplots()
+    plt.title("User time vs Signal Length Graph")
+    ax.plot(signal_length, single_cqt   , 'black', label="black")
+    ax.plot(signal_length, theano_vectorized, 'green', label="green")
+    ax.plot(signal_length, theano_matrix, 'red', label="red")
+    ax.plot(signal_length, direct_cqt, 'blue', label="blue")
+    ax.ticklabel_format(useOffset=False)
+    ax.set_xlabel('Signal Length')
+    ax.set_ylabel('Time taken for execution (in sec)')
+    plt.xticks(np.arange(signal_length[0], signal_length[-1] , signal_length[1] - signal_length[0]))
+    plt.annotate("Black - Single Looped Numpy", xy=(653226, 6.5))
+    plt.annotate("Green - Single Loop Theano", xy=(653226, 7.5))
+    plt.annotate("Blue - Matrix Multiplication, Numpy", xy=(653226, 8.5))
+    plt.annotate("Red - Matrix Multiplication Theano", xy=(653226, 9.5))
+    plt.ylim()
     plt.show()
 
-def plot_channel_graph(final_signal, channels):
+def channel_graph(final_signal, channels):
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
     direct_cqt = []
@@ -325,20 +356,32 @@ def plot_channel_graph(final_signal, channels):
         theano_vectorized.append(vectorized_theano(final_signal, 44100, i)[1])
         theano_matrix.append(matrix_theano(final_signal, 44100, i)[1])
         direct_cqt.append(matrix_cqt(final_signal, 44100, i)[1])
-    print(theano_vectorized)
-    plt.plot(single_cqt, 'black', theano_vectorized, 'orange', theano_matrix, 'red', direct_cqt, 'purple')
-    ax = plt.gca()
-    ax.set_yticklabels(ax.get_yticks())
+
+    fig, ax = plt.subplots()
+    plt.title("Variable channel vs Time Graph")
+    ax.plot(channels, single_cqt, 'black', label="black")
+    ax.plot(channels, theano_vectorized, 'green', label="green")
+    ax.plot(channels, theano_matrix, 'red', label="red")
+    ax.plot(channels, direct_cqt, 'blue', label="blue")
+    ax.ticklabel_format(useOffset=False)
+    ax.axis([1, 4, 0, 0.5])
+    ax.set_xlabel('Number of Channels')
+    ax.set_ylabel('Time taken for execution (in sec)')
+    plt.xticks(np.arange(1, 5, 1))
+    plt.annotate("Black - Single Looped Numpy", xy=(2.3, 0.4))
+    plt.annotate("Green - Single Loop Theano", xy=(2.3, 0.42))
+    plt.annotate("Blue - Matrix Multiplication, Numpy", xy=(2.3, 0.44))
+    plt.annotate("Red - Matrix Multiplication Theano", xy=(2.3, 0.46))
+    plt.ylim()
     plt.show()
 
 if __name__ == '__main__':
     signal_base = 132300
     mul_factor = 5
-    plot_usertime_graph(signal_base, mul_factor)
+
     channels = np.arange(1, 5)
-    plot_channel_graph(generate_signal(signal_base), channels)
-    plot_usertime_graph(signal_base, mul_factor)
+    channel_graph(generate_signal(signal_base), channels)
+    usertime_graph(signal_base, mul_factor)
 
     # pylab.imshow(np.log(np.abs(theano_matrix[0])), origin='lower', aspect='auto')
     # pylab.show()
-
