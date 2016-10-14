@@ -135,7 +135,7 @@ def cqt_two_without_kernel(signal, s_freq, channels=1):
     Computes the CQT of the signal using two loops with pre-computation of the kernels
     '''
     signal_width = 1/(.03*100)*s_freq
-    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
     time_list = range(0, int(len(signal) - signal_width), int(signal_width/2))
     windows, max_width= pre_compute_kernels(s_freq, freq, signal_width, "windows")
     output = np.zeros((len(time_list), len(freq)))
@@ -160,7 +160,7 @@ def cqt_single(signal, sample_freq, channels=1):
     Compute the CQT of a signal with a single loop
     '''
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     output = np.zeros((len(time_list), len(frequency_range)))
     kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
@@ -185,7 +185,7 @@ def matrix_cqt(signal, sample_freq, channels=1):
     '''
 
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     output = np.zeros((len(time_list), len(frequency_range)))
     kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
@@ -210,7 +210,7 @@ def theano_stft(signal, width, s_freq, channels=1):
     '''
 
     max_width = 1/(.03*100)*s_freq
-    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
     time = range(0, int(len(signal) - max_width), int(max_width/2))
 
     width_var = T.cscalar() #used as i in the numpy implementation
@@ -237,15 +237,15 @@ def vectorized_theano(signal, sample_freq, channels=1):
     It's being tested with memory and speed.
     '''
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     signal_matrix = T.fvector("signal_matrix")
     kernel_matrix = T.fmatrix("kernel matrix")
     kernel, k_size = pre_compute_kernels(sample_freq, frequency_range, max_width)
     output = np.zeros((len(time_list), len(frequency_range)))
-    prior = resource.getrusage(resource.RUSAGE_SELF)
     cqt_compute = kernel_matrix * signal_matrix
     func = theano.function([kernel_matrix, signal_matrix], cqt_compute, allow_input_downcast=True)
+    prior = resource.getrusage(resource.RUSAGE_SELF)
     for l_1, t in enumerate(time_list):
         n_signal = signal[l_1:l_1 + k_size]
         output[l_1] = np.sum(func(kernel, n_signal), axis=1)
@@ -261,7 +261,7 @@ def matrix_theano(signal, sample_freq, channels=1):
     '''
 
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    frequency_range = 100.*2.**(1./(12.)*np.array(range(0, 50 * channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     signal_matrix = T.fmatrix("Signal Matrix")
     kernel_matrix = T.fmatrix("Kernel Matrix")
@@ -271,10 +271,10 @@ def matrix_theano(signal, sample_freq, channels=1):
     col_index = np.arange(0, n, h)
     row_index = np.arange(max_width)
     index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
-    prior = resource.getrusage(resource.RUSAGE_SELF)
-    sliced_signal = signal[index]
     cqt_compute = T.dot(signal_matrix, kernel_matrix.T)
     func = theano.function([signal_matrix, kernel_matrix], cqt_compute, allow_input_downcast=True)
+    prior = resource.getrusage(resource.RUSAGE_SELF)
+    sliced_signal = signal[index]
     output = func(sliced_signal, kernel)
     post = resource.getrusage(resource.RUSAGE_SELF)
     user_time = post.ru_utime - prior.ru_utime
@@ -286,24 +286,22 @@ def generate_signal(signal_base, mul_factor=1):
     pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(signal_base * mul_factor))
     noise = np.random.randn(signal_base * mul_factor)
     final_signal = pure_signal + noise
-    return final_signal
+    return pure_signal
 
-def plot_graph():
+
+def plot_graph(cqt_values, title, mode, labels, annotate_coordinates, axes_label):
     fig, ax = plt.subplots()
-    plt.title("Variable channel vs Time Graph")
-    ax.plot(channels, single_cqt, 'black', label="black")
-    ax.plot(channels, theano_vectorized, 'green', label="green")
-    ax.plot(channels, theano_matrix, 'red', label="red")
-    ax.plot(channels, direct_cqt, 'blue', label="blue")
+    plt.title(title)
+    colour_list = ['black', 'green', 'red', 'blue']
+    colour_labelmap = ["Black - Single Looped Numpy", "Green - Single Loop Theano",
+                       "Blue - Matrix Multiplication, Numpy", "Red - Matrix Multiplication Theano"]
+    for index, cv in enumerate(cqt_values):
+        ax.plot(labels, cv, colour_list[index], label=colour_list[index])
     ax.ticklabel_format(useOffset=False)
-    ax.axis([1, 4, 0, 0.5])
-    ax.set_xlabel('Number of Channels')
-    ax.set_ylabel('Time taken for execution (in sec)')
-    plt.xticks(np.arange(1, 5, 1))
-    plt.annotate("Black - Single Looped Numpy", xy=(2.3, 0.4))
-    plt.annotate("Green - Single Loop Theano", xy=(2.3, 0.42))
-    plt.annotate("Blue - Matrix Multiplication, Numpy", xy=(2.3, 0.44))
-    plt.annotate("Red - Matrix Multiplication Theano", xy=(2.3, 0.46))
+    ax.set_xlabel(axes_label[0])
+    ax.set_ylabel(axes_label[1])
+    for i, xy in enumerate(annotate_coordinates):
+        plt.annotate(colour_labelmap[i], xy=xy)
     plt.ylim()
     plt.show()
 
@@ -317,37 +315,26 @@ def usertime_graph(signal_base, mul_factor):
         if mul_count >= 3:
             break
         final_signal = generate_signal(signal_base, mul_factor)
-        # three_loop.append(threeloop_cqt(final_signal, 44100)[1])
-        # two_kernel.append(cqt_two_with_kernel(final_signal, 44100)[1])
-        # two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100)[1])
         single_cqt.append(cqt_single(final_signal, 44100)[1])
         theano_vectorized.append(vectorized_theano(final_signal, 44100)[1])
         theano_matrix.append(matrix_theano(final_signal, 44100)[1])
         direct_cqt.append(matrix_cqt(final_signal, 44100)[1])
-        signal_base = signal_base * mul_factor
         signal_length.append(signal_base)
+        signal_base = signal_base * mul_factor
         mul_count += 1
-    fig, ax = plt.subplots()
-    plt.title("User time vs Signal Length Graph")
-    ax.plot(signal_length, single_cqt   , 'black', label="black")
-    ax.plot(signal_length, theano_vectorized, 'green', label="green")
-    ax.plot(signal_length, theano_matrix, 'red', label="red")
-    ax.plot(signal_length, direct_cqt, 'blue', label="blue")
-    ax.ticklabel_format(useOffset=False)
-    ax.set_xlabel('Signal Length')
-    ax.set_ylabel('Time taken for execution (in sec)')
-    plt.xticks(np.arange(signal_length[0], signal_length[-1] , signal_length[1] - signal_length[0]))
-    plt.annotate("Black - Single Looped Numpy", xy=(653226, 6.5))
-    plt.annotate("Green - Single Loop Theano", xy=(653226, 7.5))
-    plt.annotate("Blue - Matrix Multiplication, Numpy", xy=(653226, 8.5))
-    plt.annotate("Red - Matrix Multiplication Theano", xy=(653226, 9.5))
-    plt.ylim()
-    plt.show()
+    cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt]
+    plt_title = "User time vs Signal Length Graph"
+    axes_label = ["Signal Length", "Time taken for execution (in sec)"]
+    annotate_coordinates = [(653226, 6.5), (653226, 7.5), (653226, 8.5), (653226, 9.5)]
+    plot_graph(cqt_values, plt_title, "user-time", signal_length, annotate_coordinates, axes_label)
+
+    # plt.xticks(np.arange(signal_length[0], signal_length[-1] , signal_length[1] - signal_length[0]))
 
 def channel_graph(final_signal, channels):
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
     direct_cqt = []
+    cqt_values = []
     for i in channels:
         # three_loop.append(threeloop_cqt(final_signal, 44100, i)[1])
         # two_kernel.append(cqt_two_with_kernel(final_signal, 44100, i)[1])
@@ -356,32 +343,24 @@ def channel_graph(final_signal, channels):
         theano_vectorized.append(vectorized_theano(final_signal, 44100, i)[1])
         theano_matrix.append(matrix_theano(final_signal, 44100, i)[1])
         direct_cqt.append(matrix_cqt(final_signal, 44100, i)[1])
-
-    fig, ax = plt.subplots()
-    plt.title("Variable channel vs Time Graph")
-    ax.plot(channels, single_cqt, 'black', label="black")
-    ax.plot(channels, theano_vectorized, 'green', label="green")
-    ax.plot(channels, theano_matrix, 'red', label="red")
-    ax.plot(channels, direct_cqt, 'blue', label="blue")
-    ax.ticklabel_format(useOffset=False)
-    ax.axis([1, 4, 0, 0.5])
-    ax.set_xlabel('Number of Channels')
-    ax.set_ylabel('Time taken for execution (in sec)')
-    plt.xticks(np.arange(1, 5, 1))
-    plt.annotate("Black - Single Looped Numpy", xy=(2.3, 0.4))
-    plt.annotate("Green - Single Loop Theano", xy=(2.3, 0.42))
-    plt.annotate("Blue - Matrix Multiplication, Numpy", xy=(2.3, 0.44))
-    plt.annotate("Red - Matrix Multiplication Theano", xy=(2.3, 0.46))
-    plt.ylim()
-    plt.show()
+    cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt]
+    annotate_coordinates = [(2.3, 0.4), (2.3, 0.42), (2.3, 0.44), (2.3, 0.46)]
+    plt_title = "Variable channel vs Time Graph"
+    axes_label = ["Number of Channels", "Time taken for execution (in sec)"]
+    plot_graph(cqt_values, plt_title, "channel", channels, annotate_coordinates, axes_label)
 
 if __name__ == '__main__':
     signal_base = 132300
     mul_factor = 5
 
     channels = np.arange(1, 5)
-    channel_graph(generate_signal(signal_base), channels)
+    # channel_graph(generate_signal(signal_base), channels)
     usertime_graph(signal_base, mul_factor)
-
-    # pylab.imshow(np.log(np.abs(theano_matrix[0])), origin='lower', aspect='auto')
-    # pylab.show()
+    matrix = matrix_cqt(generate_signal(signal_base), 44100)
+    plot_matrix = matrix[0].transpose()
+    '''
+    pylab.imshow(np.log(np.abs(plot_matrix)), origin='lower', aspect='auto')
+    pylab.xlabel('Time (sec)')
+    pylab.ylabel('Frequency in Log scale')
+    pylab.show()
+    '''
