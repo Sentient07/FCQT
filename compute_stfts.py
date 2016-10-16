@@ -38,7 +38,6 @@ def pre_compute_kernels(sample_freq, frequency_range, default_width, output="ker
     if output is not "windows" and output is not "kernel":
         raise TypeError("The output has to be either windows / kernel")
 
-    kernel = []
     computed_window = []
     comp_width = []
     comp_width.append(int(default_width))
@@ -53,7 +52,7 @@ def pre_compute_kernels(sample_freq, frequency_range, default_width, output="ker
         comp_width.append(int(current_width))
 
     max_width = max(comp_width)
-
+    kernel = np.empty(int(max_width))
     # The Kernels are computed after padding the windows.
     # All the windows aren't the same and for multiplication to be performed later,
     # The windows are padded.
@@ -70,8 +69,8 @@ def pre_compute_kernels(sample_freq, frequency_range, default_width, output="ker
 
         i_exp = np.arange(0, len(windows))
         window_list.append(windows)
-        kernel.append(np.exp( i_exp * 2j * math.pi * freq / sample_freq) * windows)
-
+        kernel = np.vstack((kernel, np.exp( i_exp * 2j * math.pi * freq / sample_freq) * windows))
+    kernel = np.delete(kernel, (0), axis=0)
     if output == "windows":
         return window_list, max(comp_width)
     return kernel, max(comp_width)
@@ -90,8 +89,8 @@ def threeloop_cqt(signal, sample_freq, channels=1):
         The sampling frequency of the signal
     '''
     max_width = 1/(.03*100)*sample_freq
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(np.arange(0, 50)))
-    time_range = range(0, int(len(signal) - max_width), int(max_width/2))
+    frequency_range = 100.*2.**(1./(12. * channels)*np.arange(0, 50, (1.0/channels)))
+    time_range = range(0, len(signal) - int(max_width)), int(max_width/2)
     output = np.zeros((len(time_range), len(frequency_range)), dtype=np.complex)
     prior = resource.getrusage(resource.RUSAGE_SELF)
     for m, t in enumerate(time_range):
@@ -111,7 +110,7 @@ def cqt_two_with_kernel(signal, s_freq, channels=1):
     Computes the CQT of the signal using two loops without the precomputation of the kernels
     '''
     max_width = 1/(.03*100)*s_freq
-    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50)))
+    freq = 100.*2.**(1./(12. * channels)*np.arange(0, 50, (1.0/channels)))
     time = range(0, int(len(signal) - max_width), int(max_width/2))
     output = np.zeros((len(time), len(freq)), dtype=np.complex)
     prior = resource.getrusage(resource.RUSAGE_SELF)
@@ -135,7 +134,7 @@ def cqt_two_without_kernel(signal, s_freq, channels=1):
     Computes the CQT of the signal using two loops with pre-computation of the kernels
     '''
     signal_width = 1/(.03*100)*s_freq
-    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
+    freq = 100.*2.**(1./(12. * channels)*np.array(0, 50, (1.0/channels)))
     time_list = range(0, int(len(signal) - signal_width), int(signal_width/2))
     windows, max_width= pre_compute_kernels(s_freq, freq, signal_width, "windows")
     output = np.zeros((len(time_list), len(freq)))
@@ -160,7 +159,11 @@ def cqt_single(signal, sample_freq, channels=1):
     Compute the CQT of a signal with a single loop
     '''
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
+    try:
+        frequency_range = 100.*2.**(1./(12. * channels)*np.arange(0, 50, (1.0/channels)))
+    except ValueError:
+        import pdb;
+        pdb.set_trace()
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     output = np.zeros((len(time_list), len(frequency_range)))
     kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
@@ -185,7 +188,7 @@ def matrix_cqt(signal, sample_freq, channels=1):
     '''
 
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
+    frequency_range = 100.*2.**(1./(12. * channels)*np.arange(0, 50, (1.0/channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     output = np.zeros((len(time_list), len(frequency_range)))
     kernel, max_width = pre_compute_kernels(sample_freq, frequency_range, max_width, "kernel")
@@ -210,7 +213,7 @@ def theano_stft(signal, width, s_freq, channels=1):
     '''
 
     max_width = 1/(.03*100)*s_freq
-    freq = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
+    freq = 100.*2.**(1./(12. * channels)*np.arange(0, 50, (1.0/channels)))
     time = range(0, int(len(signal) - max_width), int(max_width/2))
 
     width_var = T.cscalar() #used as i in the numpy implementation
@@ -237,7 +240,7 @@ def vectorized_theano(signal, sample_freq, channels=1):
     It's being tested with memory and speed.
     '''
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12. * channels)*np.array(range(0, 50 * channels)))
+    frequency_range = 100.*2.**(1./(12. * channels)*np.arange(0, 50, (1.0/channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     signal_matrix = T.fvector("signal_matrix")
     kernel_matrix = T.fmatrix("kernel matrix")
@@ -261,7 +264,7 @@ def matrix_theano(signal, sample_freq, channels=1):
     '''
 
     max_width = int(1/(.03*100)*sample_freq)
-    frequency_range = 100.*2.**(1./(12.)*np.array(range(0, 50 * channels)))
+    frequency_range = 100.*2.**(1./(12.)*np.arange(0, 50, (1.0/channels)))
     time_list = range(0, int(len(signal) - max_width), int(max_width/2))
     signal_matrix = T.fmatrix("Signal Matrix")
     kernel_matrix = T.fmatrix("Kernel Matrix")
@@ -295,13 +298,14 @@ def plot_graph(cqt_values, title, mode, labels, annotate_coordinates, axes_label
     colour_list = ['black', 'green', 'red', 'blue']
     colour_labelmap = ["Black - Single Looped Numpy", "Green - Single Loop Theano",
                        "Blue - Matrix Multiplication, Numpy", "Red - Matrix Multiplication Theano"]
+    plot_array = []
     for index, cv in enumerate(cqt_values):
-        ax.plot(labels, cv, colour_list[index], label=colour_list[index])
+        temp_plots = ax.plot(labels, cv, colour_list[index], label=colour_list[index])
+        plot_array.append(temp_plots)
+    plt.legend(tuple([i[0] for i in plot_array]), tuple(colour_labelmap), loc=0)
     ax.ticklabel_format(useOffset=False)
     ax.set_xlabel(axes_label[0])
     ax.set_ylabel(axes_label[1])
-    for i, xy in enumerate(annotate_coordinates):
-        plt.annotate(colour_labelmap[i], xy=xy)
     plt.ylim()
     plt.show()
 
@@ -354,7 +358,7 @@ if __name__ == '__main__':
     mul_factor = 5
 
     channels = np.arange(1, 5)
-    # channel_graph(generate_signal(signal_base), channels)
+    channel_graph(generate_signal(signal_base), channels)
     usertime_graph(signal_base, mul_factor)
     matrix = matrix_cqt(generate_signal(signal_base), 44100)
     plot_matrix = matrix[0].transpose()
