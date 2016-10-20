@@ -76,6 +76,49 @@ def pre_compute_kernels(sample_freq, frequency_range, default_width, output="ker
     return kernel, max(comp_width)
 
 
+def pre_compute_algebraic_kernel(sample_freq, frequency_range, default_width):
+    computed_window = []
+    comp_width = []
+    comp_width.append(int(default_width))
+    # Here, the width and window array is constructed
+    # From the maximum width that we return, we can compute the 
+    # i_exp variable outside the for loop, which makes a the O(N**2) algorithm, O(N)
+
+    for f in frequency_range:
+        current_width = int(1/(.03*f)*sample_freq)
+        current_window = blackman(current_width)
+        computed_window.append(blackman(current_width))
+        comp_width.append(int(current_width))
+
+
+    max_width = max(comp_width)
+    kernel = np.empty(int(max_width))
+    sine_terms = np.empty(int(max_width))
+    cosine_terms = np.empty(int(max_width))
+    window_list = np.empty(int(max_width))
+
+    for f_count, freq in enumerate(frequency_range):
+        if max_width > len(computed_window[f_count]):
+            if (max_width - len(computed_window[f_count])) %2 == 0 :
+                windows = np.pad(computed_window[f_count], (max_width - len(computed_window[f_count])) / 2, 'constant')
+
+            else:
+                windows = np.append(np.pad(computed_window[f_count], (max_width - len(computed_window[f_count]) - 1) / 2, 'constant'), 0)
+
+        else:
+            windows = computed_window[f_count]
+        window_list = np.vstack((window_list, windows))
+        i_exp = np.arange(0, len(windows))
+        sine_terms = np.vstack((sine_terms, np.sin(2 * np.pi * freq * i_exp)))
+        cosine_terms = np.vstack((cosine_terms, np.cos(2 * np.pi * freq * i_exp)))
+    cosine_kernel = window_list * cosine_terms 
+    sin_kernel = window_list * sine_terms
+    cosine_kernel = np.delete(cosine_kernel, (0), axis=0)
+    sin_kernel = np.delete(sin_kernel, (0), axis=0)
+    return cosine_kernel, sin_kernel, max_width
+
+
+
 def threeloop_cqt(signal, max_width, time_range, frequency_range, kernel_details=None, channels=1):
     '''
     Computes the CQT of a signal using three loops.
@@ -218,7 +261,6 @@ def matrix_theano(signal, time_range, frequency_range, kernel_details, channels=
     signal_matrix = T.fmatrix("Signal Matrix")
     kernel_matrix = T.fmatrix("Kernel Matrix")
     h = int(max_width/2)
-    import pdb;pdb.set_trace()
     n = time_range[-1] + h
     col_index = np.arange(0, n, h)
     row_index = np.arange(max_width)
@@ -234,6 +276,47 @@ def matrix_theano(signal, time_range, frequency_range, kernel_details, channels=
     print("User time for matrix theano: " + str(post.ru_utime - prior.ru_utime))
     return output, user_time
 
+def euler_computation(signal, time_range, frequency_range, kernel_details):
+    cosine_kern, sine_kern , max_width = kernel_details
+    output = np.zeros((len(time_range), len(frequency_range)))
+    h = int(max_width/2)
+    n = time_range[-1] + h
+    col_index = np.arange(0, n, h)
+    row_index = np.arange(max_width)
+    index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
+    prior = resource.getrusage(resource.RUSAGE_SELF)
+    sliced_signal = signal[index]
+    cosine_comp = sliced_signal.dot(cosine_kern.transpose())
+    sine_comp = sliced_signal.dot(sine_kern.transpose())
+    output = cosine_comp + 1j * sine_comp
+    post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
+    print("System time for Euler computation : " + str(post.ru_stime - prior.ru_stime))
+    print("User time for Euler computation : " + str(post.ru_utime - prior.ru_utime))
+    return output, user_time
+
+def euler_computation_theano(signal, time_range, frequency_range, kernel_details):
+    cosine_kern, sine_kern , max_width = kernel_details
+    output = np.zeros((len(time_range), len(frequency_range)))
+    h = int(max_width/2)
+    n = time_range[-1] + h
+    col_index = np.arange(0, n, h)
+    row_index = np.arange(max_width)
+    index = col_index[:,np.newaxis] + row_index[np.newaxis, :]
+    signal_matrix = T.fmatrix("Signal Matrix")
+    cosine_matrix = T.fmatrix("Cosine Matrix")
+    sine_matrix = T.fmatrix("Sine Matrix")
+    cqt_compute = T.dot(signal_matrix, cosine_matrix.T) + 1j * T.dot(signal_matrix, sine_matrix.T)
+    func = theano.function([signal_matrix, cosine_matrix, sine_matrix], cqt_compute, allow_input_downcast=True)
+    prior = resource.getrusage(resource.RUSAGE_SELF)
+    sliced_signal = signal[index]
+    output = func(sliced_signal, cosine_kern, sine_kern)
+    post = resource.getrusage(resource.RUSAGE_SELF)
+    user_time = post.ru_utime - prior.ru_utime
+    print("System time for Theano's Euler computation : " + str(post.ru_stime - prior.ru_stime))
+    print("User time for Theano's Euler computation : " + str(post.ru_utime - prior.ru_utime))
+    return output, user_time
+
 def generate_signal(signal_base, mul_factor=1):
     pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(signal_base * mul_factor))
     noise = np.random.randn(signal_base * mul_factor)
@@ -244,9 +327,10 @@ def generate_signal(signal_base, mul_factor=1):
 def plot_graph(cqt_values, title, mode, labels, axes_label):
     fig, ax = plt.subplots()
     plt.title(title)
-    colour_list = ['black', 'green', 'red', 'blue']
+    colour_list = ['black', 'green', 'red', 'blue', 'yellow', 'purple']
     colour_labelmap = ["Black - Single Looped Numpy", "Green - Single Loop Theano",
-                       "Red - Matrix Multiplication Theano", "Blue - Matrix Multiplication, Numpy"]
+                       "Red - Matrix Multiplication Theano", "Blue - Matrix Multiplication, Numpy",
+                       "Yellow - Euler Comp Numpy", "Purple - Euler Comp Theano"]
     plot_array = []
     for index, cv in enumerate(cqt_values):
         temp_plots = ax.plot(labels, cv, colour_list[index], marker='o')
@@ -262,21 +346,23 @@ def usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_
     mul_count = 0
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
-    direct_cqt = []
+    direct_cqt, euler_cqt, euler_theano = [], [], []
     signal_length = []
     while  True:
         if mul_count >= 8:
             break
         final_signal = generate_signal(signal_base, mul_factor)
         time_range = np.arange(0, len(final_signal) - int(max_width), int(max_width/2))
-        single_cqt.append(cqt_single(final_signal, time_range, frequency_range, kernel_details)[1])
-        theano_vectorized.append(vectorized_theano(final_signal, time_range, frequency_range, kernel_details)[1])
-        theano_matrix.append(matrix_theano(final_signal, time_range, frequency_range, kernel_details)[1])
-        direct_cqt.append(matrix_cqt(final_signal, time_range, frequency_range, kernel_details)[1])
+        single_cqt.append(cqt_single(final_signal, time_range, frequency_range, kernel_details[0])[1])
+        theano_vectorized.append(vectorized_theano(final_signal, time_range, frequency_range, kernel_details[0])[1])
+        theano_matrix.append(matrix_theano(final_signal, time_range, frequency_range, kernel_details[0])[1])
+        direct_cqt.append(matrix_cqt(final_signal, time_range, frequency_range, kernel_details[0])[1])
+        euler_cqt.append(euler_computation(final_signal, time_range, frequency_range, kernel_details[1])[1])
+        euler_theano.append(euler_computation_theano(final_signal, time_range, frequency_range, kernel_details[1])[1])
         signal_length.append(signal_base)
         signal_base = signal_base * mul_factor
         mul_count += 1
-    cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt]
+    cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
     plt_title = "User time vs Signal Length Graph"
     axes_label = ["Signal Length", "Time taken for execution (in sec)"]
     plot_graph(cqt_values, plt_title, "user-time", signal_length, axes_label)
@@ -286,22 +372,25 @@ def usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_
 def channel_graph(final_signal, channels, time_range, sample_freq, max_width):
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
-    direct_cqt = []
-    cqt_values = []
+    direct_cqt, cqt_values, euler_cqt, euler_theano = [], [], [], []
     for i in channels:
         # three_loop.append(threeloop_cqt(final_signal, 44100, i)[1])
         # two_kernel.append(cqt_two_with_kernel(final_signal, 44100, i)[1])
         # two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100, i)[1])
         frequency_range = 100. * 2. ** (1./(12. * i) * np.arange(0, 50, (1.0/i)))
         kernel_details = pre_compute_kernels(sample_freq, frequency_range, max_width)
+        euler_kernel_details = pre_compute_algebraic_kernel(sample_freq, frequency_range, max_width)
         single_cqt.append(cqt_single(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
         theano_vectorized.append(vectorized_theano(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
         theano_matrix.append(matrix_theano(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
         direct_cqt.append(matrix_cqt(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
-    cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt]
+        euler_cqt.append(euler_computation(final_signal, time_range, frequency_range, euler_kernel_details)[1])
+        euler_theano.append(euler_computation_theano(final_signal, time_range, frequency_range, euler_kernel_details)[1])
+    cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
     plt_title = "Variable channel vs Time Graph"
     axes_label = ["Number of Channels", "Time taken for execution (in sec)"]
     plot_graph(cqt_values, plt_title, "channel", channels, axes_label)
+
 
 if __name__ == '__main__':
     signal_base = 132300
@@ -311,12 +400,16 @@ if __name__ == '__main__':
     frequency_range = 100.*2.**(1./(12.)*np.arange(0, 50))
     final_signal = generate_signal(signal_base)
     time_range = np.arange(0, len(final_signal) - int(max_width), int(max_width/2))
-    kernel_details = pre_compute_kernels(sample_freq, frequency_range, max_width)
+    default_kernel = pre_compute_kernels(sample_freq, frequency_range, max_width)
+    euler_kernel = pre_compute_algebraic_kernel(sample_freq, frequency_range, max_width)
     channels = np.arange(1, 5)
+    kernel_details = (default_kernel, euler_kernel)
     channel_graph(final_signal, channels, time_range, sample_freq, max_width)
-    #usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_range, kernel_details, max_width)
-    # matrix = matrix_cqt(final_signal, 44100)
-    # plot_matrix = matrix[0].transpose()
+    # usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_range, kernel_details, max_width)
+    matrix = euler_computation(final_signal, time_range, frequency_range, euler_kernel)
+    matrix_comp = matrix_cqt(final_signal, time_range, frequency_range, default_kernel)
+    plot_matrix = matrix[0].transpose()
+    assert np.isclose(matrix_comp[0].all(), matrix[0].all())
     '''
     pylab.imshow(np.log(np.abs(plot_matrix)), origin='lower', aspect='auto')
     pylab.xlabel('Time (sec)')
