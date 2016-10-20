@@ -77,6 +77,18 @@ def pre_compute_kernels(sample_freq, frequency_range, default_width, output="ker
 
 
 def pre_compute_algebraic_kernel(sample_freq, frequency_range, default_width):
+    '''
+    Pre computes the kernel after applying Euler's transformation to the CQT equation.
+
+    Parameters
+    ----------
+    sample_freq
+        The sampling frequency.
+    frequency_range:
+        The Frequency range over which CQT is computed
+    default_width
+        Taken as 1/3rd of the Sampling Frequency by convention.
+    '''
     computed_window = []
     comp_width = []
     comp_width.append(int(default_width))
@@ -145,7 +157,7 @@ def threeloop_cqt(signal, max_width, time_range, frequency_range, kernel_details
     print("User time for three loop computation : " + str(post.ru_utime - prior.ru_utime))
     return output, user_time
 
-def cqt_two_with_kernel(signal, max_width, time_range, frequency_range, kernel_details=None, channels=1):
+def cqt_two_with_kernel(signal, max_width, time_range, kernel_details=None):
     '''
     Computes the CQT of the signal using two loops without the precomputation of the kernels
     '''
@@ -167,7 +179,7 @@ def cqt_two_with_kernel(signal, max_width, time_range, frequency_range, kernel_d
  
     return output, user_time
 
-def cqt_two_without_kernel(signal, max_width, time_range, frequency_range, kernel_details=None, channels=1):
+def cqt_two_without_kernel(signal, max_width, time_range, freq, kernel_details=None, resolution=1):
     '''
     Computes the CQT of the signal using two loops with pre-computation of the kernels
     '''
@@ -189,7 +201,7 @@ def cqt_two_without_kernel(signal, max_width, time_range, frequency_range, kerne
         
 # windows[l_2].extend([0] * (len() - (len(my_list))))
 
-def cqt_single(signal, time_range, frequency_range, kernel_details, channels=1):
+def cqt_single(signal, time_range, frequency_range, kernel_details):
     ''' 
     Compute the CQT of a signal with a single loop
     '''
@@ -207,7 +219,7 @@ def cqt_single(signal, time_range, frequency_range, kernel_details, channels=1):
 
     return output, user_time
 
-def matrix_cqt(signal, time_range, frequency_range, kernel_details, channels=1):
+def matrix_cqt(signal, time_range, frequency_range, kernel_details):
     '''
     Direct computation of CQT using numpy.
     The signal matrix is constructed by advanced indexing of the
@@ -232,7 +244,7 @@ def matrix_cqt(signal, time_range, frequency_range, kernel_details, channels=1):
 # Computation of CQT using theano.
 
 
-def vectorized_theano(signal, time_range, frequency_range, kernel_details, channels=1):
+def vectorized_theano(signal, time_range, frequency_range, kernel_details):
     '''
     The Code is currently being tested. It's not fully implemented.
     It's being tested with memory and speed.
@@ -253,7 +265,7 @@ def vectorized_theano(signal, time_range, frequency_range, kernel_details, chann
     print("User time for vectorized theano: " + str(post.ru_utime - prior.ru_utime))
     return output, user_time
 
-def matrix_theano(signal, time_range, frequency_range, kernel_details, channels=1):
+def matrix_theano(signal, time_range, frequency_range, kernel_details):
     '''
     Direct computation of CQT without any loop using theano
     '''
@@ -277,6 +289,11 @@ def matrix_theano(signal, time_range, frequency_range, kernel_details, channels=
     return output, user_time
 
 def euler_computation(signal, time_range, frequency_range, kernel_details):
+    '''
+    Computes CQT using the kernel's cosine and sine components separately.
+    The cosine and sine components are the result of Euler transformation of 
+    exponential term in the pre computation of the kernel
+    '''
     cosine_kern, sine_kern , max_width = kernel_details
     output = np.zeros((len(time_range), len(frequency_range)))
     h = int(max_width/2)
@@ -296,6 +313,9 @@ def euler_computation(signal, time_range, frequency_range, kernel_details):
     return output, user_time
 
 def euler_computation_theano(signal, time_range, frequency_range, kernel_details):
+    '''
+    Same as euler_computation, but the computation is done using theano
+    '''
     cosine_kern, sine_kern , max_width = kernel_details
     output = np.zeros((len(time_range), len(frequency_range)))
     h = int(max_width/2)
@@ -318,13 +338,42 @@ def euler_computation_theano(signal, time_range, frequency_range, kernel_details
     return output, user_time
 
 def generate_signal(signal_base, mul_factor=1):
+    '''
+    Generates signal of a given length after adding Gaussian white noise of the same length.
+
+    Parameters
+    ----------
+    signal_base
+        The length of the signal.
+    mul_factor
+        The multiplication factor
+    '''
+
     pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(signal_base * mul_factor))
     noise = np.random.randn(signal_base * mul_factor)
     final_signal = pure_signal + noise
     return pure_signal
 
 
-def plot_graph(cqt_values, title, mode, labels, axes_label):
+def plot_graph(cqt_values, title, labels, axes_label):
+    '''
+    Plots graph with respect to time.
+    Parameters
+    ----------
+    cqt_values
+        list containing time taken by different methods that
+        computes CQT.
+    
+    title
+        The title of the plot.
+    
+    labels
+        list containing the Y coordinate details.
+    
+    axes_label
+        The labels for X and Y axes.
+    
+    '''
     fig, ax = plt.subplots()
     plt.title(title)
     colour_list = ['black', 'green', 'red', 'blue', 'yellow', 'purple']
@@ -342,11 +391,13 @@ def plot_graph(cqt_values, title, mode, labels, axes_label):
     plt.ylim()
     plt.show()
 
-def usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_range, kernel_details, max_width):
+def usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_details, max_width):
+    '''
+    Signal length vs Time taken for computation of CQT graph
+    '''
+
     mul_count = 0
-    three_loop, two_kernel, two_w_kernel = [], [], []
-    single_cqt, theano_vectorized, theano_matrix = [], [], []
-    direct_cqt, euler_cqt, euler_theano = [], [], []
+
     signal_length = []
     while  True:
         if mul_count >= 8:
@@ -365,11 +416,15 @@ def usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_
     cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
     plt_title = "User time vs Signal Length Graph"
     axes_label = ["Signal Length", "Time taken for execution (in sec)"]
-    plot_graph(cqt_values, plt_title, "user-time", signal_length, axes_label)
+    plot_graph(cqt_values, plt_title, signal_length, axes_label)
 
     # plt.xticks(np.arange(signal_length[0], signal_length[-1] , signal_length[1] - signal_length[0]))
 
 def channel_graph(final_signal, channels, time_range, sample_freq, max_width):
+    '''
+    Number of resolution vs Time taken graph
+    '''
+
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
     direct_cqt, cqt_values, euler_cqt, euler_theano = [], [], [], []
@@ -380,16 +435,16 @@ def channel_graph(final_signal, channels, time_range, sample_freq, max_width):
         frequency_range = 100. * 2. ** (1./(12. * i) * np.arange(0, 50, (1.0/i)))
         kernel_details = pre_compute_kernels(sample_freq, frequency_range, max_width)
         euler_kernel_details = pre_compute_algebraic_kernel(sample_freq, frequency_range, max_width)
-        single_cqt.append(cqt_single(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
-        theano_vectorized.append(vectorized_theano(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
-        theano_matrix.append(matrix_theano(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
-        direct_cqt.append(matrix_cqt(final_signal, time_range, frequency_range, kernel_details, channels=i)[1])
+        single_cqt.append(cqt_single(final_signal, time_range, frequency_range, kernel_details)[1])
+        theano_vectorized.append(vectorized_theano(final_signal, time_range, frequency_range, kernel_details)[1])
+        theano_matrix.append(matrix_theano(final_signal, time_range, frequency_range, kernel_details)[1])
+        direct_cqt.append(matrix_cqt(final_signal, time_range, frequency_range, kernel_details)[1])
         euler_cqt.append(euler_computation(final_signal, time_range, frequency_range, euler_kernel_details)[1])
         euler_theano.append(euler_computation_theano(final_signal, time_range, frequency_range, euler_kernel_details)[1])
     cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
     plt_title = "Variable channel vs Time Graph"
     axes_label = ["Number of Channels", "Time taken for execution (in sec)"]
-    plot_graph(cqt_values, plt_title, "channel", channels, axes_label)
+    plot_graph(cqt_values, plt_title, channels, axes_label)
 
 
 if __name__ == '__main__':
@@ -405,7 +460,7 @@ if __name__ == '__main__':
     channels = np.arange(1, 5)
     kernel_details = (default_kernel, euler_kernel)
     channel_graph(final_signal, channels, time_range, sample_freq, max_width)
-    # usertime_graph(signal_base, mul_factor, final_signal, time_range, frequency_range, kernel_details, max_width)
+    # usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_details, max_width)
     matrix = euler_computation(final_signal, time_range, frequency_range, euler_kernel)
     matrix_comp = matrix_cqt(final_signal, time_range, frequency_range, default_kernel)
     plot_matrix = matrix[0].transpose()
