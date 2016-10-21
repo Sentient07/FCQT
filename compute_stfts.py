@@ -131,7 +131,7 @@ def pre_compute_algebraic_kernel(sample_freq, frequency_range, default_width):
 
 
 
-def threeloop_cqt(signal, max_width, time_range, frequency_range, kernel_details=None, channels=1):
+def threeloop_cqt(signal, max_width, time_range, frequency_range, kernel_details=None):
     '''
     Computes the CQT of a signal using three loops.
     This is the most primitive version of the algorithm.
@@ -420,7 +420,7 @@ def usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_
 
     # plt.xticks(np.arange(signal_length[0], signal_length[-1] , signal_length[1] - signal_length[0]))
 
-def channel_graph(final_signal, channels, time_range, sample_freq, max_width):
+def channel_graph(final_signal, resolution, time_range, sample_freq, max_width):
     '''
     Number of resolution vs Time taken graph
     '''
@@ -428,7 +428,7 @@ def channel_graph(final_signal, channels, time_range, sample_freq, max_width):
     three_loop, two_kernel, two_w_kernel = [], [], []
     single_cqt, theano_vectorized, theano_matrix = [], [], []
     direct_cqt, cqt_values, euler_cqt, euler_theano = [], [], [], []
-    for i in channels:
+    for i in resolution:
         # three_loop.append(threeloop_cqt(final_signal, 44100, i)[1])
         # two_kernel.append(cqt_two_with_kernel(final_signal, 44100, i)[1])
         # two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100, i)[1])
@@ -443,8 +443,8 @@ def channel_graph(final_signal, channels, time_range, sample_freq, max_width):
         euler_theano.append(euler_computation_theano(final_signal, time_range, frequency_range, euler_kernel_details)[1])
     cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
     plt_title = "Variable channel vs Time Graph"
-    axes_label = ["Number of Channels", "Time taken for execution (in sec)"]
-    plot_graph(cqt_values, plt_title, channels, axes_label)
+    axes_label = ["Resolution", "Time taken for execution (in sec)"]
+    plot_graph(cqt_values, plt_title, resolution, axes_label)
 
 
 if __name__ == '__main__':
@@ -457,9 +457,9 @@ if __name__ == '__main__':
     time_range = np.arange(0, len(final_signal) - int(max_width), int(max_width/2))
     default_kernel = pre_compute_kernels(sample_freq, frequency_range, max_width)
     euler_kernel = pre_compute_algebraic_kernel(sample_freq, frequency_range, max_width)
-    channels = np.arange(1, 5)
+    resolution = np.arange(1, 5)
     kernel_details = (default_kernel, euler_kernel)
-    channel_graph(final_signal, channels, time_range, sample_freq, max_width)
+    channel_graph(final_signal, resolution, time_range, sample_freq, max_width)
     # usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_details, max_width)
     matrix = euler_computation(final_signal, time_range, frequency_range, euler_kernel)
     matrix_comp = matrix_cqt(final_signal, time_range, frequency_range, default_kernel)
