@@ -398,6 +398,9 @@ def usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_
 
     mul_count = 0
 
+    single_cqt, theano_vectorized, theano_matrix = [], [], []
+    direct_cqt, cqt_values, euler_cqt, euler_theano = [], [], [], []
+
     signal_length = []
     while  True:
         if mul_count >= 8:
