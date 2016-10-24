@@ -403,7 +403,7 @@ def usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_
 
     signal_length = []
     while  True:
-        if mul_count >= 8:
+        if mul_count >= 20:
             break
         final_signal = generate_signal(signal_base, mul_factor)
         time_range = np.arange(0, len(final_signal) - int(max_width), int(max_width/2))
@@ -417,6 +417,7 @@ def usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_
         signal_base = signal_base * mul_factor
         mul_count += 1
     cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
+    print(cqt_values)
     plt_title = "User time vs Signal Length Graph"
     axes_label = ["Signal Length", "Time taken for execution (in sec)"]
     plot_graph(cqt_values, plt_title, signal_length, axes_label)
@@ -452,7 +453,7 @@ def channel_graph(final_signal, resolution, time_range, sample_freq, max_width):
 
 if __name__ == '__main__':
     signal_base = 132300
-    mul_factor = 4
+    mul_factor = 1.5
     sample_freq = 44100
     max_width = 1/(.03*100)*sample_freq
     frequency_range = 100.*2.**(1./(12.)*np.arange(0, 50))
