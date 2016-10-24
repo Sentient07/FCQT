@@ -452,7 +452,7 @@ def channel_graph(final_signal, resolution, time_range, sample_freq, max_width):
 
 if __name__ == '__main__':
     signal_base = 132300
-    mul_factor = 2
+    mul_factor = 4
     sample_freq = 44100
     max_width = 1/(.03*100)*sample_freq
     frequency_range = 100.*2.**(1./(12.)*np.arange(0, 50))
@@ -462,8 +462,8 @@ if __name__ == '__main__':
     euler_kernel = pre_compute_algebraic_kernel(sample_freq, frequency_range, max_width)
     resolution = np.arange(1, 5)
     kernel_details = (default_kernel, euler_kernel)
-    channel_graph(final_signal, resolution, time_range, sample_freq, max_width)
-    # usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_details, max_width)
+    # channel_graph(final_signal, resolution, time_range, sample_freq, max_width)
+    usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_details, max_width)
     matrix = euler_computation(final_signal, time_range, frequency_range, euler_kernel)
     matrix_comp = matrix_cqt(final_signal, time_range, frequency_range, default_kernel)
     plot_matrix = matrix[0].transpose()
