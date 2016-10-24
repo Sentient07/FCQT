@@ -349,8 +349,8 @@ def generate_signal(signal_base, mul_factor=1):
         The multiplication factor
     '''
 
-    pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(signal_base * mul_factor))
-    noise = np.random.randn(signal_base * mul_factor)
+    pure_signal = np.cos(2 * math.pi * 440./44100. * np.arange(int(signal_base * mul_factor)))
+    noise = np.random.randn(int(signal_base * mul_factor))
     final_signal = pure_signal + noise
     return pure_signal
 
@@ -414,7 +414,7 @@ def usertime_graph(signal_base, mul_factor, time_range, frequency_range, kernel_
         euler_cqt.append(euler_computation(final_signal, time_range, frequency_range, kernel_details[1])[1])
         euler_theano.append(euler_computation_theano(final_signal, time_range, frequency_range, kernel_details[1])[1])
         signal_length.append(signal_base)
-        signal_base = signal_base * mul_factor
+        signal_base = int(signal_base * mul_factor)
         mul_count += 1
     cqt_values = [single_cqt, theano_vectorized, theano_matrix, direct_cqt, euler_cqt, euler_theano]
     print(cqt_values)
