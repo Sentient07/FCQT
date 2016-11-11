@@ -88,7 +88,8 @@ def pre_compute_kernels(sample_freq, frequency_range,
 
 def pre_compute_algebraic_kernel(sample_freq, frequency_range, default_width):
     '''
-    Pre computes the kernel after applying Euler's transformation to the CQT equation.
+    Pre computes the kernel after applying the transforming the exponential term to cosine and sine terms.
+    e^{\frac {-j2\pi f t}{s_f}}} = {cos(\frac {-2\pi f t}{s_f}) + jsin(\frac {-2\pi f t}{s_f})}
 
     Parameters
     ----------
@@ -608,6 +609,45 @@ def channel_graph(final_signal, freq_bins, time_range, sample_freq, max_width):
     plot_graph(cqt_values, plt_title, freq_bins, axes_label)
 
 
+def test_cqts(final_signal, time_range, sample_freq,
+              frequency_range, max_width):
+    default_kernel = pre_compute_kernels(
+        sample_freq, frequency_range, max_width)
+    symmetric_kernel = pre_compute_algebraic_kernel(
+        sample_freq, frequency_range, max_width)
+    numpy_vectorized = vectorized_numpy(
+        final_signal,
+        time_range,
+        frequency_range,
+        default_kernel)
+    theano_vectorized = vectorized_theano(
+        final_signal, time_range, frequency_range, default_kernel)
+    numpy_fully_vectorized = full_vectorized_numpy(
+        final_signal, time_range, frequency_range, default_kernel)
+    theano_fully_vectorized = full_vectorized_theano(
+        final_signal, time_range, frequency_range, default_kernel)
+    numpy_symmetric = symmetric_numpy(
+        final_signal,
+        time_range,
+        frequency_range,
+        symmetric_kernel)
+    theano_symmetric = symmetric_theano(
+        final_signal,
+        time_range,
+        frequency_range,
+        symmetric_kernel)
+    assert np.allclose(numpy_vectorized[0].all(), theano_vectorized[0].all())
+    assert np.allclose(
+        numpy_fully_vectorized[0].all(),
+        theano_fully_vectorized[0].all())
+    assert np.allclose(
+        numpy_fully_vectorized[0].all(),
+        numpy_vectorized[0].all())
+    assert np.allclose(
+        theano_fully_vectorized[0].all(),
+        numpy_symmetric[0].all())
+    assert np.allclose(numpy_symmetric[0].all(), theano_symmetric[0].all())
+
 if __name__ == '__main__':
     signal_base = 132300
     mul_factor = 4
@@ -619,23 +659,17 @@ if __name__ == '__main__':
                            int(max_width), int(max_width / 2))
     default_kernel = pre_compute_kernels(
         sample_freq, frequency_range, max_width)
-    euler_kernel = pre_compute_algebraic_kernel(
+    symmetric_kernel = pre_compute_algebraic_kernel(
         sample_freq, frequency_range, max_width)
     resolution = np.arange(1, 5)
-    kernel_details = (default_kernel, euler_kernel)
+    kernel_details = (default_kernel, symmetric_kernel)
     # channel_graph(final_signal, resolution, time_range, sample_freq, max_width)
-    matrix = symmetric_numpy(
+    test_cqts(
         final_signal,
         time_range,
+        sample_freq,
         frequency_range,
-        euler_kernel)
-    matrix_comp = full_vectorized_numpy(
-        final_signal,
-        time_range,
-        frequency_range,
-        default_kernel)
-    plot_matrix = matrix[0].transpose()
-    assert np.isclose(matrix[0].all(), matrix_comp[0].all())
+        max_width)
     usertime_graph(
         signal_base,
         mul_factor,
