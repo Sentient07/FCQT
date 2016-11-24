@@ -71,15 +71,8 @@ def pre_compute_kernels(sample_freq, frequency_range,
 
         i_exp = np.arange(0, len(windows))
         window_list.append(windows)
-        kernel = np.vstack(
-            (kernel,
-             np.exp(
-                 i_exp *
-                 2j *
-                 math.pi *
-                 freq /
-                 sample_freq) *
-                windows))
+        kernel = np.vstack((kernel,np.exp(i_exp * 2j * math.pi * freq / 
+                                          sample_freq) * windows))
     kernel = np.delete(kernel, (0), axis=0)
     if output == "windows":
         return window_list, max(comp_width)
@@ -122,10 +115,13 @@ def pre_compute_algebraic_kernel(sample_freq, frequency_range, default_width):
         if max_width > len(computed_window[f_count]):
             if (max_width - len(computed_window[f_count])) % 2 == 0:
                 windows = np.pad(computed_window[
-                                 f_count], (max_width - len(computed_window[f_count])) / 2, 'constant')
+                                 f_count], (max_width - len(computed_window[f_count]))/ 2,
+                                 'constant')
             else:
                 windows = np.append(np.pad(computed_window[
-                                    f_count], (max_width - len(computed_window[f_count]) - 1) / 2, 'constant'), 0)
+                                           f_count], 
+                                           (max_width - len(computed_window[f_count]) - 1) / 2,
+                                           'constant'), 0)
         else:
             windows = computed_window[f_count]
         window_list = np.vstack((window_list, windows))
@@ -195,8 +191,8 @@ def cqt_two_with_kernel(signal, max_width, time_range,
             windows = blackman(temp_w)
             w_i = np.arange(t, t + temp_w)
             n_signal = signal[t:t + temp_w]
-            output[l_1, l_2] = np.sum(
-                (np.exp(w_i * 1j * (-2 * math.pi) * f / s_freq) * windows) * n_signal)
+            output[l_1, l_2] = np.sum((np.exp(w_i * 1j * (-2 * math.pi) * f / s_freq) 
+                                      * windows) * n_signal)
 
     post = resource.getrusage(resource.RUSAGE_SELF)
     user_time = post.ru_utime - prior.ru_utime
@@ -222,17 +218,9 @@ def cqt_two_without_kernel(
         # import pdb; pdb.set_trace()
         for l_2, f in enumerate(frequency_range):
             n_signal = signal[t:t + max_width]
-            output[
-                l_1,
-                l_2] = np.sum(
-                np.exp(
-                    i_exp *
-                    2j *
-                    math.pi *
-                    f /
-                    s_freq) *
-                windows[l_2] *
-                n_signal)
+            output[l_1, l_2] = np.sum(np.exp(i_exp * 2j * math.pi * 
+                                             f / s_freq) * windows[l_2] *
+                                             n_signal)
 
     post = resource.getrusage(resource.RUSAGE_SELF)
     user_time = post.ru_utime - prior.ru_utime
@@ -393,11 +381,9 @@ def symmetric_theano(signal, time_range, frequency_range, kernel_details):
     sine_matrix = T.fmatrix("Sine Matrix")
     cqt_compute = T.dot(cosine_signal, cosine_matrix.T) + \
         1j * T.dot(sine_signal, sine_matrix.T)
-    func = theano.function([cosine_signal,
-                            sine_signal,
-                            cosine_matrix,
-                            sine_matrix],
-                           cqt_compute,
+
+    func = theano.function([cosine_signal, sine_signal, cosine_matrix,
+                            sine_matrix], cqt_compute,
                            allow_input_downcast=True)
     prior = resource.getrusage(resource.RUSAGE_SELF)
     sliced_former = signal[index][:, 0:h]
@@ -427,14 +413,9 @@ def generate_signal(signal_base, mul_factor=1):
         The multiplication factor
     '''
 
-    pure_signal = np.cos(
-        2 *
-        math.pi *
-        440. /
-        44100. *
-        np.arange(
-            signal_base *
-            mul_factor))
+    pure_signal = np.cos(2 * math.pi * 440. / 44100. *
+                         np.arange(signal_base * mul_factor))
+
     noise = np.random.randn(signal_base * mul_factor)
     final_signal = pure_signal + noise
     return final_signal
@@ -496,49 +477,44 @@ def usertime_graph(signal_base, mul_factor, time_range,
         final_signal = generate_signal(signal_base, mul_factor)
         time_range = np.arange(0, len(final_signal) -
                                int(max_width), int(max_width / 2))
+
         print("CQT is computed for Signal Length of : " +
               str(int((signal_base * mul_factor) / 44100)))
-        numpy_vectorized.append(
-            vectorized_numpy(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details[0])[1])
-        theano_vectorized.append(
-            vectorized_theano(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details[0])[1])
-        theano_fully_vectorized.append(
-            full_vectorized_theano(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details[0])[1])
-        numpy_fully_vectorized.append(
-            full_vectorized_numpy(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details[0])[1])
-        numpy_symmetric.append(
-            symmetric_numpy(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details[1])[1])
-        theano_symmetric.append(
-            symmetric_theano(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details[1])[1])
+
+        numpy_vectorized.append(vectorized_numpy(final_signal,
+                                                 time_range,
+                                                 frequency_range,
+                                                 kernel_details[0])[1])
+
+        theano_vectorized.append(vectorized_theano(final_signal,
+                                                   time_range,
+                                                   frequency_range,
+                                                   kernel_details[0])[1])
+
+        theano_fully_vectorized.append(full_vectorized_theano(final_signal,
+                                                              time_range,
+                                                              frequency_range,
+                                                              kernel_details[0])[1])
+
+        numpy_fully_vectorized.append(full_vectorized_numpy(final_signal,
+                                                            time_range,
+                                                            frequency_range,
+                                                            kernel_details[0])[1])
+
+        numpy_symmetric.append(symmetric_numpy(final_signal,
+                                               time_range,
+                                               frequency_range,
+                                               kernel_details[1])[1])
+
+        theano_symmetric.append(symmetric_theano(final_signal,
+                                                 time_range,
+                                                 frequency_range,
+                                                 kernel_details[1])[1])
         signal_length.append(signal_base)
         signal_base = signal_base * mul_factor
         mul_count += 1
-    cqt_values = [numpy_vectorized, theano_vectorized, theano_fully_vectorized, numpy_fully_vectorized,
-                  numpy_symmetric, theano_symmetric]
+    cqt_values = [numpy_vectorized, theano_vectorized, theano_fully_vectorized,
+                  numpy_fully_vectorized, numpy_symmetric, theano_symmetric]
     print(cqt_values[2])
     print(cqt_values[-1])
     plt_title = "User time vs Signal Length Graph"
@@ -562,48 +538,43 @@ def channel_graph(final_signal, freq_bins, time_range, sample_freq, max_width):
         # two_w_kernel.append(cqt_two_without_kernel(final_signal, 44100, i)[1])
         frequency_range = 100. * \
             2. ** (1. / (12. * i) * np.arange(0, 50, (1.0 / i)))
-        kernel_details = pre_compute_kernels(
-            sample_freq, frequency_range, max_width)
-        symmetric_kernels = pre_compute_algebraic_kernel(
-            sample_freq, frequency_range, max_width)
-        numpy_vectorized.append(
-            vectorized_numpy(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details)[1])
-        theano_vectorized.append(
-            vectorized_theano(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details)[1])
-        theano_fully_vectorized.append(
-            full_vectorized_theano(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details)[1])
-        numpy_fully_vectorized.append(
-            full_vectorized_numpy(
-                final_signal,
-                time_range,
-                frequency_range,
-                kernel_details)[1])
-        numpy_symmetric.append(
-            symmetric_numpy(
-                final_signal,
-                time_range,
-                frequency_range,
-                symmetric_kernels)[1])
-        theano_symmetric.append(
-            symmetric_theano(
-                final_signal,
-                time_range,
-                frequency_range,
-                symmetric_kernels)[1])
-        cqt_values = [numpy_vectorized, theano_vectorized, theano_fully_vectorized, numpy_fully_vectorized,
+
+        kernel_details = pre_compute_kernels(sample_freq, frequency_range,
+                                             max_width)
+        symmetric_kernels = pre_compute_algebraic_kernel(sample_freq, 
+                                                         frequency_range,
+                                                         max_width)
+
+        numpy_vectorized.append(vectorized_numpy(final_signal, time_range,
+                                                 frequency_range,
+                                                 kernel_details)[1])
+
+        theano_vectorized.append(vectorized_theano(final_signal, time_range,
+                                                   frequency_range,
+                                                   kernel_details)[1])
+
+        theano_fully_vectorized.append(full_vectorized_theano(final_signal,
+                                                              time_range,
+                                                              frequency_range,
+                                                              kernel_details)[1])
+
+        numpy_fully_vectorized.append(full_vectorized_numpy(final_signal,
+                                                            time_range,
+                                                            frequency_range,
+                                                            kernel_details)[1])
+
+        numpy_symmetric.append(symmetric_numpy(final_signal, time_range,
+                                               frequency_range,
+                                               symmetric_kernels)[1])
+
+        theano_symmetric.append(symmetric_theano(final_signal, time_range,
+                                                 frequency_range,
+                                                 symmetric_kernels)[1])
+
+        cqt_values = [numpy_vectorized, theano_vectorized,
+                      theano_fully_vectorized, numpy_fully_vectorized,
                       numpy_symmetric, theano_symmetric]
+
     plt_title = "Variable channel vs Time Graph"
     axes_label = ["Frequency Bins", "Time taken for execution (in sec)"]
     plot_graph(cqt_values, plt_title, freq_bins, axes_label)
@@ -611,41 +582,28 @@ def channel_graph(final_signal, freq_bins, time_range, sample_freq, max_width):
 
 def test_cqts(final_signal, time_range, sample_freq,
               frequency_range, max_width):
-    default_kernel = pre_compute_kernels(
-        sample_freq, frequency_range, max_width)
-    symmetric_kernel = pre_compute_algebraic_kernel(
-        sample_freq, frequency_range, max_width)
-    numpy_vectorized = vectorized_numpy(
-        final_signal,
-        time_range,
-        frequency_range,
-        default_kernel)
-    theano_vectorized = vectorized_theano(
-        final_signal, time_range, frequency_range, default_kernel)
-    numpy_fully_vectorized = full_vectorized_numpy(
-        final_signal, time_range, frequency_range, default_kernel)
-    theano_fully_vectorized = full_vectorized_theano(
-        final_signal, time_range, frequency_range, default_kernel)
-    numpy_symmetric = symmetric_numpy(
-        final_signal,
-        time_range,
-        frequency_range,
-        symmetric_kernel)
-    theano_symmetric = symmetric_theano(
-        final_signal,
-        time_range,
-        frequency_range,
-        symmetric_kernel)
+    default_kernel = pre_compute_kernels(sample_freq, frequency_range, max_width)
+    symmetric_kernel = pre_compute_algebraic_kernel(sample_freq, frequency_range,
+                                                    max_width)
+    numpy_vectorized = vectorized_numpy(final_signal, time_range, frequency_range,
+                                        default_kernel)
+    theano_vectorized = vectorized_theano(final_signal, time_range,
+                                          frequency_range, default_kernel)
+    numpy_fully_vectorized = full_vectorized_numpy(final_signal, time_range,
+                                                   frequency_range, default_kernel)
+    theano_fully_vectorized = full_vectorized_theano(final_signal, time_range,
+                                                     frequency_range, default_kernel)
+    numpy_symmetric = symmetric_numpy(final_signal, time_range, frequency_range,
+                                      symmetric_kernel)
+    theano_symmetric = symmetric_theano(final_signal, time_range, frequency_range,
+                                        symmetric_kernel)
     assert np.allclose(numpy_vectorized[0].all(), theano_vectorized[0].all())
-    assert np.allclose(
-        numpy_fully_vectorized[0].all(),
-        theano_fully_vectorized[0].all())
-    assert np.allclose(
-        numpy_fully_vectorized[0].all(),
-        numpy_vectorized[0].all())
-    assert np.allclose(
-        theano_fully_vectorized[0].all(),
-        numpy_symmetric[0].all())
+    assert np.allclose(numpy_fully_vectorized[0].all(),
+                       theano_fully_vectorized[0].all())
+    assert np.allclose(numpy_fully_vectorized[0].all(),
+                       numpy_vectorized[0].all())
+    assert np.allclose(theano_fully_vectorized[0].all(),
+                       numpy_symmetric[0].all())
     assert np.allclose(numpy_symmetric[0].all(), theano_symmetric[0].all())
 
 if __name__ == '__main__':
@@ -657,26 +615,16 @@ if __name__ == '__main__':
     final_signal = generate_signal(signal_base)
     time_range = np.arange(0, len(final_signal) -
                            int(max_width), int(max_width / 2))
-    default_kernel = pre_compute_kernels(
-        sample_freq, frequency_range, max_width)
-    symmetric_kernel = pre_compute_algebraic_kernel(
-        sample_freq, frequency_range, max_width)
+    default_kernel = pre_compute_kernels(sample_freq, frequency_range, max_width)
+    symmetric_kernel = pre_compute_algebraic_kernel(sample_freq, frequency_range,
+                                                    max_width)
     resolution = np.arange(1, 5)
     kernel_details = (default_kernel, symmetric_kernel)
     # channel_graph(final_signal, resolution, time_range, sample_freq, max_width)
-    test_cqts(
-        final_signal,
-        time_range,
-        sample_freq,
-        frequency_range,
-        max_width)
-    usertime_graph(
-        signal_base,
-        mul_factor,
-        time_range,
-        frequency_range,
-        kernel_details,
-        max_width)
+    test_cqts(final_signal, time_range, sample_freq, frequency_range,
+              max_width)
+    usertime_graph(signal_base, mul_factor, time_range, frequency_range,
+                   kernel_details, max_width)
 
     '''
     import pylab
