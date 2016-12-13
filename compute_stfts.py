@@ -401,12 +401,12 @@ def generate_signal(signal_base, mul_factor=1):
     mul_factor
         The multiplication factor
     '''
-    t = np.arange(signal_base * 10 * mul_factor)
+    t = np.arange(np.floor(signal_base * 10 * mul_factor))
     f = t/(44100.*10.)*1320.
     fs = 44100
     pure_signal = np.cos(2*np.pi*f/fs*t)
 
-    noise = np.random.randn(signal_base * 10 * mul_factor)
+    noise = np.random.randn(np.floor(signal_base * 10 * mul_factor))
     final_signal = pure_signal + noise
     return final_signal
 
